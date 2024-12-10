@@ -67,7 +67,7 @@ impl App {
     /// );
     /// ```
     fn draw(&mut self, frame: &mut Frame) {
-        let title = Line::from("Ratatui Simple Template")
+        let title = Line::from("Raspberry Pi touchscreen UI")
             .bold()
             .blue()
             .centered();
@@ -119,8 +119,7 @@ impl App {
     /// - Can be extended to add more key press handlers.
     fn on_key_event(&mut self, key: KeyEvent) {
         match (key.modifiers, key.code) {
-            (_, KeyCode::Esc | KeyCode::Char('q'))
-            | (KeyModifiers::CONTROL, KeyCode::Char('c') | KeyCode::Char('C')) => self.quit(),
+            KeyCode::Char('q') => self.quit(),
             // Add other key handlers here.
             _ => {}
         }
