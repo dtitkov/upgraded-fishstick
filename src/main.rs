@@ -1,4 +1,5 @@
 mod app;
+mod components;
 
 fn main() {
     let terminal = ratatui::init();
