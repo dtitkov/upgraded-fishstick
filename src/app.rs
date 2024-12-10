@@ -1,11 +1,15 @@
+
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::layout::Alignment;
+use ratatui::style::{Modifier, Style};
+use ratatui::widgets::block::Position;
+use ratatui::widgets::Borders;
 use ratatui::{
     crossterm,
-    style::Stylize,
-    text::Line,
-    widgets::{Block, Paragraph},
-    DefaultTerminal, Frame,
+    layout::{Constraint, Direction, Layout},
+    widgets::Block, DefaultTerminal,
+    Frame,
 };
 
 /// Represents the main application state.
@@ -17,7 +21,7 @@ pub struct App {
     ///
     /// When set to `false`, the application will terminate its main loop
     /// and exit gracefully.
-    pub running: bool,
+    running: bool
 }
 
 impl App {
@@ -26,7 +30,7 @@ impl App {
     /// The `running` field is initialized to `true`.
     pub fn new() -> Self {
         Self {
-            running: true,
+            running: true
         }
     }
 
@@ -41,13 +45,14 @@ impl App {
     /// # Returns
     /// - `Result<()>`: Returns `Ok(())` on successful execution or an error
     ///   wrapped in [`color_eyre::Result`] if something goes wrong.
-    pub fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    pub fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
         while self.running {
             terminal.draw(|f| self.draw(f))?;
             self.handle_crossterm_event()?;
         }
         Ok(())
     }
+
 
     /// This function is responsible for rendering the user interface.
     ///
@@ -67,19 +72,44 @@ impl App {
     /// );
     /// ```
     fn draw(&mut self, frame: &mut Frame) {
-        let title = Line::from("Raspberry Pi touchscreen UI")
-            .bold()
-            .blue()
-            .centered();
-        let text = "Hello, Ratatui!\n\n\
-            Created using https://github.com/ratatui/templates\n\
-            Press `Esc`, `Ctrl-C` or `q` to stop running.";
-        frame.render_widget(
-            Paragraph::new(text)
-                .block(Block::bordered().title(title))
-                .centered(),
-            frame.area(),
-        )
+
+        let layout = Layout::default().direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref());
+        let chunks = layout.split(frame.area());
+
+        let upper_block = Block::default()
+            .title("Raspberry Pi Touch Screen User Interface")
+            .borders(Borders::ALL)
+            .title_position(Position::Top)
+            .title_alignment(Alignment::Center)
+            .title_style(Style::default()
+            .add_modifier(Modifier::BOLD));
+
+        let lower_block = Block::default()
+            .borders(Borders::ALL);
+
+
+
+        frame.render_widget(upper_block, chunks[0]);
+        frame.render_widget(lower_block, chunks[1]);
+
+
+
+        // let title = Line::from("Raspberry Pi touchscreen UI")
+        //     .bold()
+        //     .blue()
+        //     .centered();
+        //
+        //
+        // let text = "Hello, Ratatui!\n\n\
+        //     Created using https://github.com/ratatui/templates\n\
+        //     Press `Esc`, `Ctrl-C` or `q` to stop running.";
+        // frame.render_widget(
+        //     Paragraph::new(text)
+        //         .block(Block::bordered().title(title))
+        //         .centered(),
+        //     frame.area(),
+        // )
     }
 
     /// Handles input events using crossterm's event system.
