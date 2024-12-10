@@ -113,13 +113,11 @@ impl App {
     ///
     /// # Behavior
     /// - Quits the application on the following key combinations:
-    ///   - `Esc`
     ///   - `q`
-    ///   - `Ctrl-C` or `Ctrl-c`
     /// - Can be extended to add more key press handlers.
     fn on_key_event(&mut self, key: KeyEvent) {
         match (key.modifiers, key.code) {
-            KeyCode::Char('q') => self.quit(),
+            (_, KeyCode::Char('q')) => self.quit(),
             // Add other key handlers here.
             _ => {}
         }
