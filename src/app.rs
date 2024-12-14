@@ -1,163 +1,155 @@
-
-use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::layout::Alignment;
-use ratatui::style::{Modifier, Style};
-use ratatui::widgets::block::Position;
-use ratatui::widgets::Borders;
+use color_eyre::{
+    eyre::{ Context},
+    Result
+};
+use crossterm::event;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    crossterm,
-    layout::{Constraint, Direction, Layout},
-    widgets::Block, DefaultTerminal,
+    buffer::{ Buffer },
+    layout::{Constraint, Layout, Rect},
+    widgets::{Block, Tabs, Widget},
+    text::{Line, Span},
+    style::{ Color },
     Frame,
+    DefaultTerminal
 };
 
-/// Represents the main application state.
-///
-/// The `App` struct contains all the necessary state information
-/// required to control the application's lifecycle and runtime behavior.
+use strum::{ IntoEnumIterator, EnumIter, FromRepr, Display};
+
+
+use crate::{
+    tabs::{ About },
+    theme::THEME,
+};
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    #[default]
+    Running,
+    Quit
+}
+#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
+enum Tab {
+    #[default]
+    About,
+}
+
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct App {
-    /// Indicates whether the application is currently running.
-    ///
-    /// When set to `false`, the application will terminate its main loop
-    /// and exit gracefully.
-    running: bool
+    mode: Mode,
+    tab: Tab,
+    about_tab: About,
 }
 
 impl App {
-    /// Creates a new instance of the `App` struct.
-    ///
-    /// The `running` field is initialized to `true`.
-    pub fn new() -> Self {
-        Self {
-            running: true
-        }
-    }
-
-    /// Runs the application.
-    ///
-    /// This function initializes the terminal, enters the main application loop,
-    /// and renders the user interface while listening for input events.
-    ///
-    /// # Parameters
-    /// - `terminal`: A [`DefaultTerminal`] instance for handling terminal interactions.
-    ///
-    /// # Returns
-    /// - `Result<()>`: Returns `Ok(())` on successful execution or an error
-    ///   wrapped in [`color_eyre::Result`] if something goes wrong.
     pub fn run(&mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        while self.running {
-            terminal.draw(|f| self.draw(f))?;
-            self.handle_crossterm_event()?;
+        while self.is_running() {
+            terminal.draw(|f| self.draw(f))
+                .wrap_err("Failed to draw terminal")?;
+            self.handle_events()?;
         }
         Ok(())
     }
 
-
-    /// This function is responsible for rendering the user interface.
-    ///
-    /// It is called within the main application loop to draw UI elements to the terminal frame.
-    /// You can add widgets to customize the user interface in this function.
-    ///
-    /// # Parameters
-    /// - `frame`: A mutable reference to the [`Frame`](https://docs.rs/ratatui/latest/ratatui/struct.Frame.html)
-    ///   used to render widgets in the terminal.
-    ///
-    /// # Example
-    /// ```rust
-    /// frame.render_widget(
-    ///     Paragraph::new("Hello, UI!")
-    ///         .block(Block::default().title("Example")),
-    ///     frame.area(),
-    /// );
-    /// ```
-    fn draw(&mut self, frame: &mut Frame) {
-
-        let layout = Layout::default().direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref());
-        let chunks = layout.split(frame.area());
-
-        let upper_block = Block::default()
-            .title("Raspberry Pi Touch Screen User Interface")
-            .borders(Borders::ALL)
-            .title_position(Position::Top)
-            .title_alignment(Alignment::Center)
-            .title_style(Style::default()
-            .add_modifier(Modifier::BOLD));
-
-        let lower_block = Block::default()
-            .borders(Borders::ALL);
-
-
-
-        frame.render_widget(upper_block, chunks[0]);
-        frame.render_widget(lower_block, chunks[1]);
-
-
-
-        // let title = Line::from("Raspberry Pi touchscreen UI")
-        //     .bold()
-        //     .blue()
-        //     .centered();
-        //
-        //
-        // let text = "Hello, Ratatui!\n\n\
-        //     Created using https://github.com/ratatui/templates\n\
-        //     Press `Esc`, `Ctrl-C` or `q` to stop running.";
-        // frame.render_widget(
-        //     Paragraph::new(text)
-        //         .block(Block::bordered().title(title))
-        //         .centered(),
-        //     frame.area(),
-        // )
+    fn is_running(&self) -> bool {
+        self.mode != Mode::Quit
     }
 
-    /// Handles input events using crossterm's event system.
-    ///
-    /// This function continuously reads input events and acts upon them,
-    /// such as key presses, mouse clicks, or terminal resize events.
-    ///
-    /// # Parameters
-    /// - `event`: A [`crossterm::event::Event`] representing the input event.
-    ///
-    /// # Behavior
-    /// - If the event is a key press, it delegates the handling to `on_key_event`.
-    /// - Mouse and resize events are currently ignored.
-    fn handle_crossterm_event(&mut self) -> Result<()> {
+    fn draw(&self, frame: &mut Frame){
+        frame.render_widget(self, frame.area());
+    }
+}
+
+impl Widget for &App {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    {
+        let vertical = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Min(0),
+            Constraint::Length(1)
+        ]);
+
+        let [title_bar, tab, bottom_bar] = vertical.areas(area);
+
+        Block::new().style(THEME.root).render(area, buf);
+
+        self.render_title_bar(title_bar, buf);
+        self.render_selected_tab(tab, buf);
+
+        App::render_bottom_bar(bottom_bar, buf);
+    }
+}
+
+impl App {
+    fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
+        let layout = Layout::horizontal([
+            Constraint::Min(0),
+            Constraint::Length(43)
+        ]);
+        let [title, tabs] = layout.areas(area);
+
+        Span::default().content("TUI application").style(THEME.app_title).render(title, buf);
+
+        let titles = Tab::iter().map(Tab::title);
+
+        Tabs::new(titles)
+            .style(THEME.tabs)
+            .highlight_style(THEME.tabs_selected)
+            .select(self.tab as usize)
+            .divider("")
+            .padding("","")
+            .render(tabs, buf);
+    }
+
+    fn handle_events(&mut self) -> Result<()> {
         match event::read()? {
-            Event::Key(key) if key.kind == KeyEventKind::Press => self.on_key_event(key),
-            Event::Mouse(_) => {}
-            Event::Resize(_, _) => {}
+            Event::Key(key) if key.kind == KeyEventKind::Press => self.handle_key_press(key),
             _ => {}
         }
         Ok(())
     }
 
-    /// Handles specific key press events.
-    ///
-    /// This function handles different key combinations and takes appropriate
-    /// actions based on the input.
-    ///
-    /// # Parameters
-    /// - `key`: A [`crossterm::event::KeyEvent`] representing the key press.
-    ///
-    /// # Behavior
-    /// - Quits the application on the following key combinations:
-    ///   - `q`
-    /// - Can be extended to add more key press handlers.
-    fn on_key_event(&mut self, key: KeyEvent) {
-        match (key.modifiers, key.code) {
-            (_, KeyCode::Char('q')) => self.quit(),
-            // Add other key handlers here.
+    fn handle_key_press(&mut self, key: KeyEvent)
+    {
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             _ => {}
         }
     }
 
-    /// Quits the application by setting the running flag to false.
-    ///
-    /// This function changes the application state to "not running",
-    /// which causes the main loop to exit and the application to terminate.
-    fn quit(&mut self) {
-        self.running = false;
+    fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
+        match self.tab {
+            Tab::About => self.about_tab.render(area, buf),
+        };
+    }
+
+    fn render_bottom_bar(area:Rect, buf: &mut Buffer) {
+        let keys = [
+            ("Q/ESC", "Quit")
+        ];
+
+        let spans: Vec<_> = keys
+            .iter()
+            .flat_map(|(key, desc)| {
+                let key = Span::styled(format!(" {key} "), THEME.key_binding.key);
+                let desc = Span::styled(format!(" {desc} "), THEME.key_binding.description);
+                [key, desc]
+            })
+            .collect();
+
+        Line::from(spans)
+            .centered()
+            .style((Color::Indexed(236), Color::Indexed(232)))
+            .render(area, buf);
+    }
+
+}
+
+impl Tab {
+    fn title(self) -> String {
+        match self {
+            Self::About => String::new()
+        }
     }
 }
