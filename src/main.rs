@@ -1,10 +1,15 @@
 mod app;
-mod components;
+mod theme;
+mod tabs;
 
-fn main() {
+use app::App;
+use color_eyre::Result;
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
     let terminal = ratatui::init();
-    let mut app = app::App::new();
-    app.run(terminal).unwrap();
-    ratatui::restore()
+    let app_result = App::default().run(terminal);
+    ratatui::restore();
+    app_result
 }
 
